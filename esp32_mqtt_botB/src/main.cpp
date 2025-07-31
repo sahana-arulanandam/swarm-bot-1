@@ -7,9 +7,9 @@
 
 #define BOT_ID "B"
 #define NEXT_BOT_TOPIC "/bot/C"
-const char* ssid = "mario";
-const char* password = "westvirginia";
-const char* mqtt_server = "10.130.145.225";
+const char* ssid = "Heckers-dad";
+const char* password = "hjahify1";
+const char* mqtt_server = "192.168.161.246";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -62,7 +62,7 @@ void setup_motors() {
 }
 
 void moveForward() {
-  analogWrite(ENA, 255); analogWrite(ENB, 255);
+  analogWrite(ENA, 70); analogWrite(ENB, 70);
   digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
 }
@@ -74,13 +74,13 @@ void stopMotors() {
 }
 
 void turnRight() {
-  analogWrite(ENA, 255); analogWrite(ENB, 255);
+  analogWrite(ENA, 70); analogWrite(ENB, 70);
   digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
   digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
 }
 
 void turnLeft() {
-  analogWrite(ENA, 255); analogWrite(ENB, 255);
+  analogWrite(ENA, 70); analogWrite(ENB, 70);
   digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
 }
@@ -121,30 +121,41 @@ void turnToAngle(int targetAngle) {
 }
 
 void travelScanDistance(int totalCM) {
-  mqttLog("Target distance: " + String(totalCM));
+  mqttLog("Target distance: " + String(totalCM) + " cm");
   const float step = 18.25;
   int steps = round(totalCM / step);
 
   for (int i = 0; i < steps; i++) {
-    long dist = readDistanceCM();
-    if (dist <= 15) {
-      mqttLog("Obstacle ahead. Waiting...");
-      stopMotors();
-      while (readDistanceCM() <= 15) {
-        mqttLog("Still blocked: " + String(readDistanceCM()));
-        delay(300);
-        client.loop();
-        yield();
-      }
-      mqttLog("Path clear.");
-    }
+    mqttLog("Step " + String(i + 1) + " of " + String(steps));
+
+    // Start moving forward
     moveForward();
-    delay(250);
+    unsigned long start = millis();
+    while (millis() - start < 250) {
+      long dist = readDistanceCM();
+      if (dist <= 15) {
+        stopMotors();
+        mqttLog("Obstacle detected at " + String(dist) + " cm. Stopping...");
+
+        // Wait until path clears
+        while (readDistanceCM() <= 15) {
+          mqttLog("Still blocked: " + String(readDistanceCM()) + " cm");
+          delay(300);
+          client.loop(); yield();
+        }
+
+        mqttLog("Path clear. Resuming...");
+        moveForward();  // Resume remaining movement in this burst
+        start = millis(); // Reset burst timer
+      }
+
+      client.loop(); yield();
+    }
+
     stopMotors();
     delay(150);
-    client.loop();
-    yield();
   }
+
   mqttLog("Movement complete.");
 }
 

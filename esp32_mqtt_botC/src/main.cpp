@@ -6,9 +6,9 @@
 #include "MPU6050.h"
 
 #define BOT_ID "C"
-const char* ssid = "mario";
-const char* password = "westvirginia";
-const char* mqtt_server = "10.130.145.225";
+const char* ssid = "Heckers-dad";
+const char* password = "hjahify1";
+const char* mqtt_server = "192.168.161.246";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -119,30 +119,44 @@ void turnToAngle(int targetAngle) {
 }
 
 void travelScanDistance(int totalCM) {
-  mqttLog("Target distance: " + String(totalCM));
+  mqttLog("Target distance: " + String(totalCM) + " cm");
   const float step = 18.25;
   int steps = round(totalCM / step);
+
   for (int i = 0; i < steps; i++) {
-    long dist = readDistanceCM();
-    if (dist <= 15) {
-      mqttLog("Obstacle ahead. Waiting...");
-      stopMotors();
-      while (readDistanceCM() <= 15) {
-        mqttLog("Still blocked: " + String(readDistanceCM()));
-        delay(300);
-        client.loop(); yield();
-      }
-      mqttLog("Path clear.");
-    }
+    mqttLog("Step " + String(i + 1) + " of " + String(steps));
+
+    // Start moving forward
     moveForward();
-    delay(250);
+    unsigned long start = millis();
+    while (millis() - start < 250) {
+      long dist = readDistanceCM();
+      if (dist <= 15) {
+        stopMotors();
+        mqttLog("Obstacle detected at " + String(dist) + " cm. Stopping...");
+
+        // Wait until path clears
+        while (readDistanceCM() <= 15) {
+          mqttLog("Still blocked: " + String(readDistanceCM()) + " cm");
+          delay(300);
+          client.loop(); yield();
+        }
+
+        mqttLog("Path clear. Resuming...");
+        moveForward();  // Resume remaining movement in this burst
+        start = millis(); // Reset burst timer
+      }
+
+      client.loop(); yield();
+    }
+
     stopMotors();
     delay(150);
-    client.loop(); yield();
   }
+
   mqttLog("Movement complete.");
 }
-
+  
 void handleCommand(String msg) {
   if (busy) {
     mqttLog("ERROR: Bot C is busy and cannot accept new commands.");
