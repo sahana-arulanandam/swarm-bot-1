@@ -62,7 +62,7 @@ void setup_motors() {
 }
 
 void moveForward() {
-  analogWrite(ENA, 70); analogWrite(ENB, 70);
+  analogWrite(ENA, 150); analogWrite(ENB, 150);
   digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
 }
