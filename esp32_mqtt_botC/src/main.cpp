@@ -125,38 +125,45 @@ void travelScanDistance(int totalCM) {
 
   for (int i = 0; i < steps; i++) {
     mqttLog("Step " + String(i + 1) + " of " + String(steps));
+    
+    long dist = readDistanceCM();
+    mqttLog("Distance: " + String(dist) + " cm");
 
-    // Start moving forward
-    moveForward();
-    unsigned long start = millis();
-    while (millis() - start < 250) {
-      long dist = readDistanceCM();
-      if (dist <= 15) {
-        stopMotors();
-        mqttLog("Obstacle detected at " + String(dist) + " cm. Stopping...");
-
-        // Wait until path clears
-        while (readDistanceCM() <= 15) {
-          mqttLog("Still blocked: " + String(readDistanceCM()) + " cm");
-          delay(300);
-          client.loop(); yield();
-        }
-
-        mqttLog("Path clear. Resuming...");
-        moveForward();  // Resume remaining movement in this burst
-        start = millis(); // Reset burst timer
-      }
-
-      client.loop(); yield();
+    if (dist <= 5) {
+      stopMotors();
+      mqttLog("Obstacle very close (" + String(dist) + " cm). Reversing.");
+      // reverse a little
+      digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+      digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+      analogWrite(ENA, 100); analogWrite(ENB, 100);
+      delay(300);
+      stopMotors();
+      delay(300);
+      continue;
     }
 
+    if (dist <= 15) {
+      mqttLog("Obstacle detected. Waiting...");
+      stopMotors();
+      while (readDistanceCM() <= 15) {
+        mqttLog("Still blocked: " + String(readDistanceCM()) + " cm");
+        delay(300);
+        client.loop(); yield();
+      }
+      mqttLog("Path clear. Resuming.");
+    }
+
+    // Move one burst
+    moveForward();
+    delay(250);
     stopMotors();
     delay(150);
+    client.loop(); yield();
   }
 
   mqttLog("Movement complete.");
 }
-  
+
 void handleCommand(String msg) {
   if (busy) {
     mqttLog("ERROR: Bot C is busy and cannot accept new commands.");
